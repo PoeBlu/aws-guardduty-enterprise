@@ -24,15 +24,19 @@ DRY_RUN=False
 
 def create_parent_detector(gd_client, region):
     if DRY_RUN:
-        logger.info("Need to create a Detector in {} for the GuardDuty Master account".format(region))
+        logger.info(
+            f"Need to create a Detector in {region} for the GuardDuty Master account"
+        )
         return(None)
 
-    logger.info("Creating a Detector in {} for the GuardDuty Master account".format(region))
+    logger.info(
+        f"Creating a Detector in {region} for the GuardDuty Master account"
+    )
     try:
         response = gd_client.create_detector(Enable=True)
         return(response['DetectorId'])
     except ClientError as e:
-        logger.error("Failed to create detector in {}. Aborting...".format(region))
+        logger.error(f"Failed to create detector in {region}. Aborting...")
         exit(1)
 
 def get_all_members(region, gd_client, detector_id):
@@ -50,7 +54,7 @@ def get_all_members(region, gd_client, detector_id):
     return(output)
 
 def process_region(args, region):
-    print("Processing Region {}".format(region))
+    print(f"Processing Region {region}")
     gd_client = boto3.client('guardduty', region_name=region)
     org_client = boto3.client('organizations')
 
@@ -63,10 +67,14 @@ def process_region(args, region):
         else:
             detector_id = response['DetectorIds'][0]
     except ClientError as e:
-        logger.error("Unable to list detectors in region {}. Skipping this region.".format(region))
+        logger.error(
+            f"Unable to list detectors in region {region}. Skipping this region."
+        )
         return(False)
     except EndpointConnectionError as e:
-        logger.error("Unable to list detectors in region {}. Skipping this region.".format(region))
+        logger.error(
+            f"Unable to list detectors in region {region}. Skipping this region."
+        )
         return(False)
 
 
@@ -78,9 +86,9 @@ def process_region(args, region):
             continue
         if a['Id'] not in gd_status:
             if DRY_RUN:
-                print("Need to enable GuardDuty for {}({})".format(a['Name'], a['Id']))
+                print(f"Need to enable GuardDuty for {a['Name']}({a['Id']})")
             else:
-                print("Enabling GuardDuty for {}({})".format(a['Name'], a['Id']))
+                print(f"Enabling GuardDuty for {a['Name']}({a['Id']})")
             if not args.accept_only:
                 invite_account(a, detector_id, region, args.message)
                 time.sleep(3)
@@ -90,15 +98,19 @@ def process_region(args, region):
         if gd_status[a['Id']]['RelationshipStatus'] == "Enabled":
             # print("{}({}) is already enabled for GuardDuty in {}".format(a['Name'], a['Id'], region))
             continue
-        print("{}({}) is in unexpected state {} for GuardDuty in {}".format(a['Name'], a['Id'], gd_status[a['Id']]['RelationshipStatus'], region))
+        print(
+            f"{a['Name']}({a['Id']}) is in unexpected state {gd_status[a['Id']]['RelationshipStatus']} for GuardDuty in {region}"
+        )
         return()
 
 def invite_account(account, detector_id, region, message):
     if DRY_RUN:
-        print("Need to Invite {}({}) to this GuardDuty Master".format(account['Name'], account['Id']))
+        print(
+            f"Need to Invite {account['Name']}({account['Id']}) to this GuardDuty Master"
+        )
         return(None)
     client = boto3.client('guardduty', region_name=region)
-    print("Inviting {}({}) to this GuardDuty Master".format(account['Name'], account['Id']))
+    print(f"Inviting {account['Name']}({account['Id']}) to this GuardDuty Master")
     response = client.create_members(
         AccountDetails=[
             {
@@ -116,13 +128,15 @@ def invite_account(account, detector_id, region, message):
 
 def accept_invite(account, role_name, region):
     if DRY_RUN:
-        print("Need to accept invite in {}({})".format(account['Name'], account['Id']))
+        print(f"Need to accept invite in {account['Name']}({account['Id']})")
         return(None)
-    print("Accepting invite in {}({})".format(account['Name'], account['Id']))
+    print(f"Accepting invite in {account['Name']}({account['Id']})")
     organization_role_arn = "arn:aws:iam::{}:role/{}"
     session_creds = get_creds(organization_role_arn.format(account['Id'], role_name))
     if session_creds is False:
-        print("Unable to assume role into {}({}) to accept the invite".format(account['Name'], account['Id']))
+        print(
+            f"Unable to assume role into {account['Name']}({account['Id']}) to accept the invite"
+        )
         return(False)
     child_client = boto3.client('guardduty', region_name=region,
         aws_access_key_id = session_creds['AccessKeyId'],
@@ -149,7 +163,7 @@ def get_creds(role_arn):
         session = client.assume_role(RoleArn=role_arn, RoleSessionName="EnableGuardDuty")
         return(session['Credentials'])
     except Exception as e:
-        print(u"Failed to assume role {}: {}".format(role_arn, e))
+        print(f"Failed to assume role {role_arn}: {e}")
         return(False)
 # end get_payer_creds()
 
@@ -168,7 +182,7 @@ def get_consolidated_billing_subaccounts(args):
     if args.payer_arn is not None:
         payer_creds = get_creds(args.payer_arn)
         if payer_creds == False:
-            print("Unable to assume role in payer {}".format(args.payer_arn))
+            print(f"Unable to assume role in payer {args.payer_arn}")
             exit(1)
 
         org_client = boto3.client('organizations',
@@ -194,10 +208,11 @@ def get_consolidated_billing_subaccounts(args):
             output = output + response['Accounts']
             response = org_client.list_accounts( MaxResults=20, NextToken=response['NextToken'] )
 
-        output = output + response['Accounts']
-        return(output)
+        return output + response['Accounts']
     except ClientError as e:
-        print("Unable to get account details from Organizational Parent: {}.\nAborting...".format(e))
+        print(
+            f"Unable to get account details from Organizational Parent: {e}.\nAborting..."
+        )
         exit(1)
 
 def do_args():
@@ -259,8 +274,7 @@ if __name__ == '__main__':
     if args.region == "ALL":
         ec2 = boto3.client('ec2')
         response = ec2.describe_regions()
-        for r in response['Regions']:
-            regions.append(r['RegionName'])
+        regions.extend(r['RegionName'] for r in response['Regions'])
     else:
         regions.append(args.region)
 

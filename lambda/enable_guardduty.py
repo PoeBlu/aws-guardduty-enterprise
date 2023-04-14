@@ -28,7 +28,7 @@ def handler(event, context):
         'region': ['string'],  // optional, if un-specified, runs all regions
     }
     '''
-    logger.debug("Received event: " + json.dumps(event, sort_keys=True))
+    logger.debug(f"Received event: {json.dumps(event, sort_keys=True)}")
     message = json.loads(event['Records'][0]['Sns']['Message'])
 
     # Setup Logger to save for an email
@@ -40,7 +40,7 @@ def handler(event, context):
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    logger.info("Received message: " + json.dumps(message, sort_keys=True))
+    logger.info(f"Received message: {json.dumps(message, sort_keys=True)}")
 
     # account_id to operate on must be specified
     if "account_id" not in message:
@@ -81,10 +81,14 @@ def process_region(event, region):
             # An account can only have one detector per region
             detector_id = response['DetectorIds'][0]
     except ClientError as e:
-        logger.error("Unable to list detectors in region {}. Skipping this region.".format(region))
+        logger.error(
+            f"Unable to list detectors in region {region}. Skipping this region."
+        )
         return(False)
     except EndpointConnectionError as e:
-        logger.error("Unable to connect to GuardDuty in region {}. Skipping this region.".format(region))
+        logger.error(
+            f"Unable to connect to GuardDuty in region {region}. Skipping this region."
+        )
         return(False)
 
     gd_status = get_all_members(region, gd_client, detector_id)
